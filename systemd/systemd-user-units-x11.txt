@@ -1,0 +1,40 @@
+
+systemd-user-units / X-Applications
+View History
+Writing Units for X11 Applications
+
+Writing daemon units is easy, it makes sense to write units for mpd, gpg-agent, etc. But what if you want every possible thing to be handled by systemd --user? You can also write units that work with X11 applications, such as your web browser, Steam, GIMP and anything else.
+Multiple instances of the same service
+
+Sometimes you want to have two of the same unit running at the same time. If your unit is called name.service and you try to run systemctl --user start name.service while name.service is already started, you will run into issues. One way to get around this is to name your unit name@.service. This way you can specify a variable when starting, stopping, or enabling the unit. Take a look at the dwb unit that I have written:
+
+[Unit]
+Description=lightweight web browser for display %i
+After=i3wm.target
+
+[Service]
+Environment=DISPLAY=%i
+ExecStart=/usr/bin/dwb
+
+[Install]
+WantedBy=mystuff.target
+
+Note that in the description it has this little %i in there. When you start or enable a systemd unit, it will replace %i with the string between the @ and the .service part of your unit. So if I start dwb using systemctl --user start dwb@:0.service then it will substitue :0 wherever there is a %i, so it will look like
+
+[Unit]
+Description=lightweight web browser for display :0
+After=i3wm.target
+
+[Service]
+Environment=DISPLAY=:0
+ExecStart=/usr/bin/dwb
+
+[Install]
+WantedBy=mystuff.target
+
+to systemd. I made the %i correspond to the DISPLAY variable, but you can put %i anywhere you want. For tmux I have it specify which target session it will start, so if I start tmux@wgiokas.service and tmux@not-me.service they will not confilict and can be tracked separately.
+Some notes
+
+X11 does some weird thing with the DISPLAY variable, and for most units that run or require an X server you will have to add a line reading Environment=DISPLAY=<your display or %i> I personally try to use the %i as often as possible because it allows me to change the display without having to change the unit itself.
+
+

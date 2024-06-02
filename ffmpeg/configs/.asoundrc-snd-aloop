@@ -1,0 +1,58 @@
+# modprobe snd-aloop pcm_substreams=1
+
+pcm.!default { type plug slave.pcm "hw:Loopback,0,0" }
+# pcm.pulse { type pulse }
+# ctl.pulse { type pulse }
+# pcm.!default { type pulse }
+# ctl.!default { type pulse }
+
+pcm.multi {
+    type route;
+    slave.pcm {
+        type multi;
+        slaves.a.pcm "output";
+        slaves.b.pcm "loopin";
+        slaves.a.channels 2;
+        slaves.b.channels 2;
+        bindings.0.slave a;
+        bindings.0.channel 0;
+        bindings.1.slave a;
+        bindings.1.channel 1;
+        bindings.2.slave b;
+        bindings.2.channel 0;
+        bindings.3.slave b;
+        bindings.3.channel 1;
+    }
+
+    ttable.0.0 1;
+    ttable.1.1 1;
+    ttable.0.2 1;
+    ttable.1.3 1;
+}
+
+pcm.!default {
+	type plug
+	slave.pcm "multi"
+} 
+
+pcm.output {
+	type alsa
+	card "hw:0,0"
+	format	"44100:16:2"
+}
+# pulse {
+#        type                    "alsa"
+#        name                    "Sound Card"
+#        device                  "hw:0,0"     # optional
+#        format                  "44100:16:2" # optional
+# }
+
+pcm.loopin {
+	type plug
+	slave.pcm "hw:Loopback,0,0"
+}
+
+pcm.loopout {
+	type plug
+	slave.pcm "hw:Loopback,1,0"
+}

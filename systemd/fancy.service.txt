@@ -1,0 +1,75 @@
+The first possibility is to copy the unit file to /etc/systemd/system/httpd.service and change the chosen settings:
+
+[Unit]
+Description=Some HTTP server
+After=remote-fs.target sqldb.service memcached.service
+Requires=sqldb.service memcached.service
+AssertPathExists=/srv/www
+
+[Service]
+Type=notify
+ExecStart=/usr/sbin/some-fancy-httpd-server
+Nice=0
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
+
+Alternatively, the administrator could create a drop-in file /etc/systemd/system/httpd.service.d/local.conf with the following contents:
+
+[Unit]
+After=memcached.service
+Requires=memcached.service
+# Reset all assertions and then re-add the condition we want
+AssertPathExists=
+AssertPathExists=/srv/www
+
+[Service]
+Nice=0
+PrivateTmp=yes
+
+
+Extending the Default Unit Configuration
+To extend the default unit file with additional configuration options, first create a configuration directory in /etc/systemd/system/. If extending a service unit, execute the following command as root:
+
+mkdir /etc/systemd/system/name.service.d/
+
+Replace name with the name of the service you want to extend. The above syntax applies to all unit types.
+Create a configuration file in the directory made in the previous step. Note that the file name must end with the .conf suffix. Type:
+
+touch /etc/systemd/system/name.service.d/config_name.conf
+
+Replace config_name with the name of the configuration file. This file adheres to the normal unit file structure, therefore all directives must be specified under appropriate sections, see Section 10.6.1, “Understanding the Unit File Structure”.
+For example, to add a custom dependency, create a configuration file with the following content:
+
+[Unit]
+Requires=new_dependency
+After=new_dependency
+
+Where new_dependency stands for the unit to be marked as a dependency. Another example is a configuration file that restarts the service after its main process exited, with a delay of 30 seconds:
+
+[Service]
+Restart=always
+RestartSec=30
+
+It is recommended to create small configuration files focused only on one task. Such files can be easily moved or linked to configuration directories of other services.
+To apply changes made to the unit, execute as root:
+
+systemctl daemon-reload
+systemctl restart name.service
+
+Example 10.20. Extending the httpd.service Configuration
+To modify the httpd.service unit so that a custom shell script is automatically executed when starting the Apache service, perform the following steps. First, create a directory and a custom configuration file:
+
+~]# mkdir /etc/systemd/system/httpd.service.d/
+~]# touch /etc/systemd/system/httpd.service.d/custom_script.conf
+
+Provided that the script you want to start automatically with Apache is located at /usr/local/bin/custom.sh, insert the following text to the custom_script.conf file:
+
+[Service]
+ExecStartPost=/usr/local/bin/custom.sh
+
+To apply the unit changes, execute:
+
+~]# systemctl daemon-reload
+~]# systemctl restart httpd.service

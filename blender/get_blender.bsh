@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# https://projects.blender.org/
+# Clone v2.79b
+git clone --branch v2.79b https://projects.blender.org/blender/blender.git --single-branch
+git clone --branch v2.79b git@projects.blender.org:Mersenne/blender2.79.git --single-branch
+https://projects.blender.org/Mersenne/blender2.79.git
+
+# ssh-keygen -t ed25519 -C "recsvintage@gmail.com"
+
+cd blender
+git submodule update --init --recursive
+# git submodule foreach git checkout master
+# git submodule foreach git pull --rebase origin master
+
+#### If you want to update your git clone checkout to the latest source do (in ~/blender-git/blender/):
+# git pull --rebase
+# git submodule foreach git pull --rebase origin master
+

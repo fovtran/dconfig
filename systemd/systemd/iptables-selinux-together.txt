@@ -1,0 +1,361 @@
+
+Using SELinux and iptables Together
+
+One of the things I have wanted to do with SELinux for years is figure out a way to make SELinux and iptables work together, but each time I looked at it, my use cases became too complicated. James Morris and Paul Moore worked on a tool called Secmark way back in the Red Hat Enterprise Linux (RHEL) 5 time frame. My simple implementation of Secmark is to use iptables rules to define labels on packets as they flow within an SELinux system.
+
+Secmark has been used for years in Multi-level Security (MLS) type environments, but pretty much ignored in targeted policy. On an MLS system, the security label of the packet is more important then the type label. Meaning you can prevent a process running as â€œunclassifiedâ€ from reading a â€œTop Secretâ€ packet.
+
+Note: This article is not about labeled networking. (Labels Packets passing between machines over the Network).
+
+In a targeted system, we do not usually use levels, so I wanted to use type enforcement, meaning controlling which processes can send/recv packets based on the type of the process and the type of the packet. Secmark allows you to write rules that label packets that come into port 80 allowing you to write a rule that allows a process labeled httpd_t to send/recv packets labeled httpd_packet_t. But what about Firefox, Squid, etc.? My fear about labeling packets was an explosion of packets would generate very complicated policy. Taking this to the extreme you might end up with packet types for every port type, httpd_packet_t, bind_packet_t, dns_packet_t .... Or even worse, a type for each port_types and network combined. httpd_internet_packet_t versus httpd_intranet_packet_t, or httpd_eth0_packet_t and httpd_eth1_packet_t.
+
+As you can see this would quickly become confusing. And writing policy would become impossible for the distributions.
+unlabeled_t packet type
+
+Currently, by default, we do not label any packets in policy, so the kernel labels these packets as unlabeled_t. Because of this every SELinux domain on the system that uses the network, has the rules:
+
+allow MYDOMAIN unlabed_t:packet { send recv };
+
+This means that if you used Secmark to labeled packets, and you take the fire wall down, the kernel would start labeling all packets as unlabeled_t. Every network domain would suddenly gain more access. This means taking down your firewall or reloading your firewall, you would not only allow ports to be attacked from outside, you would lower your SELinux protection, potentially allowing confined domains to start to send/recv packets from untrusted networks.
+Removing the unlabeled_t rules
+
+In the latest Fedora Releases I added a module called unlabelednet containing all the rules to allow MYDOMAIN unlabeled_t:packet {send recv }. If you disable this policy package, all confined domains will loose the ability to send/recv unlabeled_t packets. I will be back porting this to RHEL6. This means you can stop confined domains from using the network unless you write rules for a labeled packet.
+Use Case
+
+As I mentioned above, every time I looked into this problem, I ended up with an explosion of types. I finally came upon a couple of use cases where I could write some simple rules and policy to further secure my laptop. I wanted to write policy to prevent all confined domains that are started at boot (system domains) from talking to the external network, and allow all domains started by my login process (user domains) to talk to both the internal and external networks. The idea here is I do not want processes like avahi, or sssd, or sshd or any other process that gets started at boot to be listening or affected by packets from an untrusted network. I want processes started by my login, like Firefox or my VPN to be able to talk to the network. If my vpn is shut down the system domains are off the network, while I can still use the Internet for browsing and email.
+
+The nice thing about this example is you could use it to setup an Apache server that could only talk to the internal network and would reject packets from the external network.
+
+I decided to create just three types for my network. I will explain the SELinux policy later in the article.
+
+type internal_packet_t: Iptables will label all packets that originate or are destined for the internal network as internal_packet_t;
+
+type dns_external_packet_t: Iptables will label all packets destined to the external network on udp/tcp port 53 as dns_external_packet_t. I added this type because I wanted to dontaudit certain confined domains from talking to dns servers external to my private network.
+
+Type external_packet_t: Will be the default label for all packets on the machine not covered by the the first two definitions.
+Introducing secmarkgen
+
+I am no iptables expert. Calling me an iptables novice would be kind. So I asked Eric Paris to write up an example of how you could write iptables rules to apply a label to a packet. I took his rules and generated a helper shell script called secmarkgen, you can either use my secmarkgen script to generate iptables rules or generate them yourself.
+
+Running secmarkgen -h will show you the usage:
+
+
+Usage: ./secmarkgen -i
+
+Usage: ./secmarkgen -s NAME
+
+Usage: ./secmarkgen -T iptablescmd -P protocol -p port[:...] -N network[,...] -t selinux_type -m MCS NAME
+
+Usage: ./secmarkgen -f NAME
+
+ 
+
+You need to write rules to initialize secmark labels.
+
+./secmarkgen -i
+
+Then you need to name your networks. (Iptables chain)
+
+./secmarkgen -s INTERNAL
+
+Now you can add one or more rules about this named network.
+
+./secmarkgen -n 255.255.255.255,127/8,10.0.0.0/8,172.16.0.0/16,224/24,192.168/16 INTERNAL
+
+Now you want to finish the secmark rules by assigning a packet type label to the network.
+
+./secmarkgen -f -t internal_packet_t INTERNAL
+
+Here's the script generated the following iptables rules:
+
+
+###################################################################
+
+# ./secmarkgen -i
+
+###################################################################
+
+iptables -F -t security
+
+iptables -t security -A INPUT -m state --state ESTABLISHED,RELATED -j CONNSECMARK --restore
+
+iptables -t security -A OUTPUT -m state --state ESTABLISHED,RELATED -j CONNSECMARK --restore
+
+###################################################################
+
+# ./secmarkgen -s INTERNAL
+
+###################################################################
+
+iptables -t security -X INTERNAL 2> /dev/null
+
+iptables -t security -N INTERNAL
+
+###################################################################
+
+# ./secmarkgen -n 255.255.255.255,127/8,10.0.0.0/8,172.16.0.0/16,224/24,192.168/16 INTERNAL
+
+###################################################################
+
+iptables -A OUTPUT -t security -d 255.255.255.255,127/8,10.0.0.0/8,172.16.0.0/16,224/24,192.168/16 -j INTERNAL
+
+iptables -A INPUT -t security -s 255.255.255.255,127/8,10.0.0.0/8,172.16.0.0/16,224/24,192.168/16 -j INTERNAL
+
+###################################################################
+
+# ./secmarkgen -f -t internal_packet_t INTERNAL
+
+###################################################################
+
+iptables -t security -A INTERNAL -j SECMARK --selctx system_u:object_r:internal_packet_t:s0
+
+iptables -t security -A INTERNAL -j CONNSECMARK --save
+
+iptables -t security -A INTERNAL -j ACCEPT
+
+I will leave it up to the reader to examine and understand the iptables rules. (I always loved that cop out when I was in school.)
+The secmark_test Script
+
+Here is my full Secmark script (secmark_test.sh) that I use to generate the rules to confine my network:
+
+./secmarkgen -i
+
+./secmarkgen -s INTERNAL
+
+./secmarkgen -n 255.255.255.255,127/8,10.0.0.0/8,172.16.0.0/16,224/24,192.168/16 INTERNAL
+
+./secmarkgen -f -t internal_packet_t INTERNAL
+
+./secmarkgen -s DNS
+
+./secmarkgen -P udp -p 53 DNS
+
+./secmarkgen -P tcp -p 53 DNS
+
+./secmarkgen -f -t dns_external_packet_t DNS
+
+./secmarkgen -s EXTERNAL
+
+./secmarkgen EXTERNAL
+
+./secmarkgen -f -t external_packet_t EXTERNAL
+
+./secmarkgen -T ip6tables -i
+
+./secmarkgen -T ip6tables -s INTERNAL
+
+./secmarkgen -T ip6tables -n FEC0::/10,::1/128,FF::/8,FE80::/10,FC00::/7 INTERNAL
+
+./secmarkgen -T ip6tables -f -t internal_packet_t INTERNAL
+
+./secmarkgen -T ip6tables -s EXTERNAL
+
+./secmarkgen -T ip6tables EXTERNAL
+
+./secmarkgen -T ip6tables -f -t external_packet_t EXTERNAL
+
+Now I generate the iptables rules:
+
+# ./secmark_test.sh > /tmp/rules
+
+One problem is I can not install the rules yet. Since I have not written the SELinux policy to define the *_packet_t packet types, the iptables rules would fail to install. If you tried to install these rules you would see a dmesg output saying the kernel does not know what an internal_packet_t type is.
+SELinux Policy
+
+Here is the policy that I use, called secmark.te :
+
+
+policy_module(secmark, 1.0)
+
+gen_require(`
+
+attribute domain;
+
+attribute sysadm_usertype;
+
+# Domains that a staff user could transition to
+
+attribute staff_usertype;
+
+attribute telepathy_domain;
+
+type ping_t;
+
+type vpnc_t;
+
+type ssh_t;
+
+type nsplugin_t;
+
+type mozilla_plugin_t;
+
+# System domains that want to talk to the external network
+
+type ntpd_t;
+
+type sssd_t;
+
+')
+
+# Type Definitions
+
+attribute external_packet;
+
+type internal_packet_t;
+
+corenet_packet(internal_packet_t)
+
+type dns_external_packet_t, external_packet;
+
+corenet_packet(dns_external_packet_t)
+
+type external_packet_t, external_packet;
+
+corenet_packet(external_packet_t)
+
+# Allow Rules
+
+allow domain internal_packet_t:packet { recv send };
+
+allow sysadm_usertype external_packet:packet { recv send };
+
+allow staff_usertype external_packet:packet { recv send };
+
+allow vpnc_t external_packet:packet { recv send };
+
+allow ssh_t external_packet:packet { recv send };
+
+allow mozilla_plugin_t external_packet:packet { recv send };
+
+allow nsplugin_t external_packet:packet { recv send };
+
+allow telepathy_domain external_packet:packet { recv send };
+
+allow ping_t external_packet:packet { recv send };
+
+allow ntpd_t external_packet:packet { recv send };
+
+dontaudit sssd_t dns_external_packet_t:packet { recv send };
+
+Lets look at the policy more closely. First there's:
+
+policy_module(secmark, 1.0)
+
+This just defines the policy module. Next, we add requirements:
+
+
+gen_require(`
+
+attribute domain;
+
+attribute sysadm_usertype;
+
+
+# Domains that a staff user could transition to
+
+attribute staff_usertype;
+
+attribute telepathy_domain;
+
+type ping_t;
+
+type vpnc_t;
+
+type ssh_t;
+
+type nsplugin_t;
+
+type mozilla_plugin_t;
+
+
+# System domains that want to talk to the external network
+
+type ntpd_t;
+
+type sssd_t;
+
+')
+
+When you are writing SELinux policy you have to reference all types/attributes before using them in an allow rule. You can either define new types or in this case add a gen_requires block. The gen_requires block tells SELinux to not install this policy, if any of these attributes or types are not defined in other parts of policy.
+
+A couple of attributes to look at, in selinux policy domain, is an attribute of all processes types. staff_usertype is an attribute that is given to all specific staff user processes. Similarly sysadm_usertype is an attribute given to all specific sysadm user processes, If you added other user types like xguest or user, you would have to add similar rules in policy. The telepathy_domain is the domain of all the telepathy applications.
+
+In this section I define the new types that I will use for identifying network packets on my system. I also defined an attribute external_packet, so I can group rules related to external packets together. I am using the corenet_packet interface, to identify to SELinux that these types are associated with packets.
+
+
+attribute external_packet;
+
+type internal_packet_t;
+
+corenet_packet(internal_packet_t)
+
+type dns_external_packet_t, external_packet;
+
+corenet_packet(dns_external_packet_t)
+
+type external_packet_t, external_packet;
+
+corenet_packet(external_packet_t)
+
+Now lets look at the allow rules:
+
+allow domain internal_packet_t:packet { recv send };
+
+This rule allows all processes on the system to send and receive all internal packets.
+
+The next rules allow all (most) staff and sysadm domains, programs executed by the staff or sysadm user directly, to send and recv external packets. Notice I use the attribute external_packet instead of the types directly. This gives the staff domains access to both the external_packet_t and the dns_external_packet_t.
+
+
+allow sysadm_usertype external_packet:packet { recv send };
+
+allow staff_usertype external_packet:packet { recv send };
+
+allow vpnc_t external_packet:packet { recv send };
+
+allow ssh_t external_packet:packet { recv send };
+
+allow mozilla_plugin_t external_packet:packet { recv send };
+
+allow nsplugin_t external_packet:packet { recv send };
+
+allow telepathy_domain external_packet:packet { recv send };
+
+allow ping_t external_packet:packet { recv send };
+
+The next rule allows the ntpd_t domain to send and receive external packets, since ntpd talks to time servers on the public network. I could have defined an ntp_external_packet_t, and added iptables rules to make this more secure, but I decided not, since I did not want an explosion of types.
+
+allow ntpd_t external_packet:packet { recv send };
+
+dontaudit sssd_t dns_external_packet_t:packet { recv send };
+
+The sssd program looks at all entries in my /etc/resolv.conf and checks to see if it can use them. When I use vpn to come into my network, I end up with dns records from the external and internal network in my /etc/resolv.conf file.
+
+Since I do not want sssd talking to any system other then on my private network, I want to dontaudit this access.
+Compile, Install and Run
+
+Now it's time to pull everything together. First I compile my policy:
+
+# make -f /usr/share/selinux/devel/Makefile
+
+Then I install my policy:
+
+# semodule -i secmark.pp
+
+Now I can install the rules on my system:
+
+ 
+
+# sh /tmp/rules
+
+I want to tell iptables and ip6tables to remember for the next boot.
+
+
+# service iptables save
+iptables: Saving firewall rules to /etc/sysconfig/iptables:[ OK ]
+# service ip6tables save
+ip6tables: Saving firewall rules to /etc/sysconfig/ip6table[ OK ]
+
+At this point every packet on my machine should have one of the three labels.
+
+Now I can watch for avc messages concerning any of these labeled packets. If I see ones I can decide whether or not I want to allow/dontaudit these avc messages, or try to figure out if something is going very wrong on my system.
+
+

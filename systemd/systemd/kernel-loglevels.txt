@@ -1,0 +1,107 @@
+ Introduction to the Linux kernel log levels
+
+    Egidio Docile 
+    System Administration & Configuration 
+    28 September 2018 
+
+Contents
+
+        1. Objective
+        2. Requirements
+        3. Difficulty
+        4. Introduction
+        5. The Linux kernel log levels
+        6. How to check the current default log level
+        7. Changing the default console log level
+        8. Conclusions
+
+Objective
+The objective of this tutorial is to learn about the various linux kernel log levels, how they are organized, and how we can setup what messages should be displayed on the console depending on their severity.
+Requirements
+
+    Root privileges to edit configuration files
+
+Difficulty
+EASY
+Introduction
+The management of Linux kernel log files is one crucial aspect of a machine administration: logs can simply inform us about the state of daemon, or show critical messages or warnings. In this tutorial, we will see the various type of log level used by the linux kernel, how they are organized by severity and how we can filter messages displayed on the console depending on it.
+The Linux kernel log levels
+There are basically eight log levels which a message sent by the linux kernel can adopt, starting from level 0 and decreasing in severity 'till level 7: the lowest log level identifier, the most critical context.
+
+When a log level is set as the default for the console, either persistently or temporarily, it acts as a filter, so that only messages with a log level lower than it, (therefore messages with an higher severity) are displayed. Let's see, briefly, how log levels are organized: The first log level is 0, identified by the KERN_EMERG string. This is the highest level in order of severity: it's adopted by messages about system instability or imminent crashes.
+
+Loglevel 1, or KERN_ALERT it's what comes immediately after. This level is used in situations where the user attention is immediately required.
+
+The next log level in order of severity is KERN_CRIT, or loglevel 2. This level of severity is used to inform about critical errors, both hardware or software related.
+
+Loglevel 3, also identified by the KERN_ERR string, it's the next in the scale. Messages adopting this level are often used to notify the user about non-critical errors, as for example a failed or problematic device recognition, or more generally driver-related problems.
+KERN_WARNING, or loglevel 4 it's the log level usually used as the default in the majority of linux distributions. This level it's used to display warnings or messages about non imminent errors.
+
+Loglevel 5 it's KERN_NOTICE. Messages which uses this level of severity are about events which may be worth noting.
+
+Loglevel 6 it's KERN_INFO: this is the log level used for informational messages about the action performed by the kernel.
+
+Finally, we have KERN_DEBUG, or loglevel 7, which is mainly used for debugging.
+How to check the current default log level
+Checking the default loglevel used on our system it's very easy. All we have to do is to examine the content of the /proc/sys/kernel/printk file. For those of you who don't know, /proc it's a virtual filesystem: the files contained in it are not actually on the disk, but are a visual representation of the system state created by the kernel and maintained in memory. In this case, for example, we can use the file mentioned above to query information about the default console log level set in our system. All we have to do is to run:
+
+$ cat /proc/sys/kernel/printk
+
+This is the typical output of the command:
+
+4       4       1       7
+
+The first value in our output is the current console_loglevel. This is the information we were looking for: the value, 4 in this case, represents the log level currently used. As said before this means that only messages adopting a severity level higher than it, will be displayed on the console.
+
+The second value in the output represents the default_message_loglevel. This value is automatically used for messages without a specific log level: if a message is not associated with a log level, this one will be used for it.
+
+The third value in the output reports the minimum_console_loglevel status. It indicates the minimum loglevel which can be used for console_loglevel. The level here used it's 1, the highest.
+
+Finally, the last value represents the default_console_loglevel, which is the default loglevel used for console_loglevel at boot time.
+
+For the sake of completeness, we must say that the same information can be retrieved also by using the sysctl command, running:
+
+$ sysctl kernel.printk
+
+Changing the default console log level
+We just saw how to retrieve information about the current loglevel in use for the console. In some situations we may want to change that value: let's see how we can accomplish this task.
+
+The most straightforward method we can use, is to write the new value to the /proc/sys/kernel/printk file. This however is a temporary solution, and the new setting will not persist a machine reboot. Say we want to change the default console loglevel to 3, here is what we would run:
+
+$ echo "3" | sudo tee /proc/sys/kernel/printk
+
+Or if using the root account directly:
+
+# echo "3" > /proc/sys/kernel/printk
+
+By looking at the content of the file, we can verify the loglevel is now the one we specified in our command:
+
+$ cat /proc/sys/kernel/printk
+3       4       1       7
+
+We can obtain the same result using the sysctl command:
+
+sudo sysctl -w kernel.printk=3
+
+Let me repeat it again: these are temporary, non-persistent solutions. To change the default loglevel in a persistent way, we must modify the /etc/default/grub file, passing the loglevel parameter to the kernel command line at boot:
+
+GRUB_TIMEOUT=5
+GRUB_DISTRIBUTOR="$(sed 's, release .*$,,g' /etc/system-release)"
+GRUB_DEFAULT=saved
+GRUB_DISABLE_SUBMENU=true
+GRUB_TERMINAL_OUTPUT="console"
+GRUB_CMDLINE_LINUX="loglevel=3 resume=UUID=df5a0685-43f8-433a-8611-57335a10ca8d"
+GRUB_DISABLE_RECOVERY="true"
+
+Above is the content of the /etc/default/grub file, and highlighted it's the parameter which should be added to GRUB_CMDLINE_LINUX, which contains the kernel command line instructions. In this case we used loglevel=3, since we wanted to use that specific loglevel for the console. After modifying the file and saving the changes, we must reload grub so that the new configuration will be applied at the next reboot: the command to perform this operation depends on the distribution we are running. Generically the command is:
+
+$ sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+
+On Debian-based distribution, a wrapper script is used to basically perform the same operation:
+
+$ sudo update-grub
+
+The grub configuration will be updated, and on the next reboot, the specified log level will be adopted as the default.
+Conclusions
+In this tutorial we have learned how the linux kernel logs are organized depending on their severity level. We also saw how we can alter the default setup so that only certain messages sent by the kernel are displayed on the console, using the same criteria. Finally we saw how to render those changes persistent. 
+

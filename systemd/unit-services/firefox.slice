@@ -1,0 +1,62 @@
+[Unit]
+Description=Slice used to run companion programs to Scylla. Memory, CPU and IO restricted
+Before=slices.target
+
+[Slice]
+MemoryAccounting=true
+IOAccounting=true
+IPAccounting=true
+CPUAccounting=true
+TaskAccounting=true
+RemoveIPC=yes
+
+CPUWeight=20
+IOWeight=10
+
+MemoryHigh=20%
+MemoryLimit=20%
+CPUShares=20
+BlockIOWeight=10
+
+LogLevel=trace
+# The most safe 
+ProtectSystem=strict
+
+# This option stops the sandboxed process and any of its children from obtaining new privileges.
+NoNewPrivileges=true
+
+# This option stops the process from changing any kernel variables.
+ProtectKernelTunables=true
+
+# This option stops the process from loading or unloading kernel modules.
+ProtectKernelModules=true
+
+# This option stops the process from reading and writing directly to the kernel log. It must use the system log application to record any log messages.
+ProtectKernelLogs=true
+
+# This option stops the process from modifying the system control groups.
+ProtectControlGroups=true
+
+# This option stops the process from modifying any code that is running in the system’s memory.
+MemoryDenyWriteExecute=true
+
+# This option stops the process from setting the set-user-ID (SUID) or set-group-ID (SGID) on files or directories. This ability can be abused to elevate privileges.
+RestrictSUIDSGID=true
+
+# This option stops the process from accessing the kernel keyring of other processes that are running as the same user.
+KeyringMode=private
+
+# This option stops the process from changing the hardware and software system clocks.
+ProtectClock=true
+
+# This option stops the process from enabling real-time scheduling that can be abused to overload the CPU.
+RestrictRealtime=true
+
+# This option stops the process from accessing physical devices attached to the system such as storage devices or USB devices.
+PrivateDevices=true
+
+PrivateTmp=true
+
+
+# Environment="DISPLAY=:0.0"
+PassEnvironment="DISPLAY=:0.0"

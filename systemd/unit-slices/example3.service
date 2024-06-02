@@ -1,0 +1,30 @@
+# Unit to set up the interface
+# Next, we create a definition in /usr/lib/systemd/system/attach-enp3s1f0@.service. 
+# This service associates the enp3s1f0 with a specified network namespace. 
+# It also sets up addresses within  the network namespace. 
+# In iproute2, the command to run a process within a  specified network namespace is ip netns exec $namespace $command.
+
+[Unit]
+Description=Attach enp3s1f0 to Named network namespace %i
+Requires=netns@%i.service
+After=netns@%i.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Environment File containing address and gateway definitions
+EnvironmentFile=/etc/enp3s1f0.conf
+
+# Associate the enp3s1f0 NIC with the network namespace
+ExecStart=/usr/sbin/ip link set enp3s1f0 netns %i
+
+# Run iproute2 (inside the netns) to bring the NIC up
+ExecStart=/usr/sbin/ip netns exec %i ip l set up dev enp3s1f0
+
+# Run iproute2 (inside the netns) to add the address/gateway
+ExecStart=/usr/sbin/ip netns exec %i ip a add $ADDRESS broadcast $BROADCAST dev enp3s1f0
+ExecStart=/usr/sbin/ip netns exec %i ip r add default via $GATEWAY dev enp3s1f0
+
+# Run iproute2 (inside the netns) to bring the NIC down (on stop)
+ExecStop=/usr/sbin/ip netns exec %i ip l set down dev enp3s1f0

@@ -1,0 +1,44 @@
+# Get python
+https://www.python.org/ftp/python/3.7.2/Python-3.7.2.tar.xz
+https://www.python.org/ftp/python/2.7.16/Python-2.7.16.tar.xz
+
+git clone -b master https://git.launchpad.net/kicad
+cd <your kicad source mirror>
+mkdir -p build/release
+mkdir build/debug               # Optional for debug build.
+cd build/release
+cmake -DCMAKE_BUILD_TYPE=Release \
+
+# FreeCAD
+git clone https://github.com/FreeCAD/FreeCAD.git freecad-code
+$ mkdir freecad-build
+$ cd freecad-build
+$ cmake ../freecad-code (or whatever the path is to your FreeCAD source folder)
+$ make -j$(nproc --ignore=2)
+$ cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_QT5=ON .
+Qt designer plugin
+
+# If you want to develop Qt stuff for FreeCAD, you'll need the Qt Designer plugin that provides all custom widgets of FreeCAD. Go to:
+	freecad/src/Tools/plugins/widget
+
+# So far we don't provide a makefile -- but calling
+
+	qmake plugin.pro
+
+#creates it. Once that's done, calling
+
+make
+
+# will create the library libFreeCAD_widgets.so. To make this library known to Qt Designer you have to copy the file to $QTDIR/plugin/designer
+
+# Making a debian package
+
+dh-make
+devscripts
+
+#optional, used for checking if packages are standard-compliant
+lintian
+debuild
+
+#replace by the name of the package you just created
+lintian your-fresh-new-freecad-package.deb

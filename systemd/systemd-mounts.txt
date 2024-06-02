@@ -1,0 +1,88 @@
+Example systemd .mount file:
+
+[Mount]
+What=/dev/disk/by-uuid/9269aa88-3a31-4299-bbb1-4e528a89d222
+Where=/mnt/mydata
+Type=ext4
+Options=defaults
+	
+[Mount]
+What=/dev/disk/by-uuid/9269aa88-3a31-4299-bbb1-4e528a89d222
+Where=/mnt/mydata
+Type=ext4
+Options=defaults
+
+Important: Mount units must be named after the mount point directories they control.
+
+Example: the mount point /home/lennart must be configured in a unit file home-lennart.mount.
+
+So we create a file like this:
+
+# vim /etc/systemd/system/mnt-mydata.mount
+
+[Unit]
+Description=Mount Some of my files to empty mydata dir
+
+[Mount]
+What=/dev/disk/by-uuid/9269aa88-3a31-4299-bbb1-4e528a89d222
+Where=/mnt/mydata
+Type=ext4
+Options=defaults
+	
+# vim /etc/systemd/system/mnt-mydata.mount
+ 
+[Unit]
+Description=Mount Some of my files to empty mydata dir
+ 
+[Mount]
+What=/dev/disk/by-uuid/9269aa88-3a31-4299-bbb1-4e528a89d222
+Where=/mnt/mydata
+Type=ext4
+Options=defaults
+
+Of course you should signal systemd to load the unit file after you’re done editing:
+
+# systemctl daemon-reload
+# systemctl start mnt-mydata.mount
+	
+# systemctl daemon-reload
+# systemctl start mnt-mydata.mount
+
+You can view state of the mount like other units:
+
+# systemctl status mnt-mydata.mount
+	
+# systemctl status mnt-mydata.mount
+
+Important: If you want it to be mounted on each boot, you should also include an [Install] section in the unit file:
+
+[Unit]
+Description=Mount Some of my files to empty mydata dir
+
+[Mount]
+What=/dev/disk/by-uuid/9269aa88-3a31-4299-bbb1-4e528a89d222
+Where=/mnt/mydata
+Type=ext4
+Options=defaults
+ 
+[Install]
+WantedBy=multi-user.target
+	
+[Unit]
+Description=Mount Some of my files to empty mydata dir
+ 
+[Mount]
+What=/dev/disk/by-uuid/9269aa88-3a31-4299-bbb1-4e528a89d222
+Where=/mnt/mydata
+Type=ext4
+Options=defaults
+ 
+[Install]
+WantedBy=multi-user.target
+
+ And the enable the unit to be started at boot:
+
+# systemctl enable mnt-backups.mount
+	
+# systemctl enable mnt-backups.mount
+

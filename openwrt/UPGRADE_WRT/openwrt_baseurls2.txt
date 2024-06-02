@@ -1,0 +1,116 @@
+# Router con OpenWRT
+
+LAN: 192.168.2.0
+LAN MAC: 00:8C:54:AD:78:01
+
+WAN: 192.168.1.114
+WAN MAC: 00:8C:54:AD:78:02
+
+-------------
+
+df -hT 
+
+opkg update
+opkg list | grep nfs
+
+opkg install ethtool acl 
+opkg list-installed
+opkg list-upgradable | cut -f 1 -d " " | xargs opkg install
+
+opkg install curl nbd mutt kmod-usbip-client usbip-client kmod-fs-nfs kmod-fs-nfs-v3 
+opkg install ddns-scripts ddns-scripts_freedns_42_pl ddns-scripts_no-ip_com ddns-scripts_nsupdate 
+opkg install samba4-client samba36-client samba4-admin samba36-server samba4-server apache apache-mod-lua mariadb-client mariadb-server nginx nginx-all-module
+opkg install vsftpd 
+opkg install gpioctl-sysfs gpiod-tools kmod-gpio-dev kmod-gpio-mcp23s08 kmod-gpio-nxp-74hc164 kmod-gpio-pca953x kmod-gpio-pcf857x 
+opkg install kmod-i2c-gpio kmod-i2c-gpio-custom kmod-i2c-mux-gpio kmod-input-gpio-encoder kmod-input-gpio-keys kmod-input-gpio-keys-polled kmod-leds-gpio kmod-ledtrig-gpio kmod-mdio-gpio kmod-spi-gpio libgpiod i2c-tools kmod-i2c-algo-bit kmod-i2c-algo-pca kmod-i2c-algo-pcf kmod-i2c-core kmod-i2c-mux	 kmod-i2c-smbus	 kmod-eeprom-at24	 kmod-regmap-i2c	python-smbus	python3-smbus	uledd	kmod-hwmon-pwmfan	
+opkg install adb-enablemodem adb
+apkg remove acl kmod-ppp kmod-fs-ext4 luci-proto-ppp kmod-nf-reject6 ip6tables odhcp6c odhcpd-ipv6only
+
+mount /overlay && firstboot && reboot
+./luci-modulecache
+ /tmp/.luci-indexcache.
+rm /tmp/luci-modulecache/* /tmp/luci-indexcache
+rm /tmp/opkg-lists/openwrt_base
+rm /tmp/opkg-lists/openwrt_core
+rm /tmp/opkg-lists/openwrt_freifunk
+rm /tmp/opkg-lists/openwrt_kmods
+rm /tmp/opkg-lists/openwrt_luci
+rm /tmp/opkg-lists/openwrt_packages
+rm /tmp/opkg-lists/openwrt_routing
+rm /tmp/opkg-lists/openwrt_telephony
+
+ethtool –s [device_name] speed [10/100/1000] duplex [half/full] autoneg [on/off]
+ /usr/sbin/uhttpd -f -h /www -r OpenWrt -x /cgi-bin -t 60 -T 30 -k 20 -A 1 -n 3 -N 100 -R -p 0.0.0.0:80 -p [::]
+ 
+ 
+switch_root
+du -cks *|sort -rn|head
+cat /proc/filesystems
+cat /proc/cpuinfo
+
+------------------
+cat /proc/mtd
+modprobe nandsim first_id_byte=0x01 second_id_byte=0xf1 third_id_byte=0x80
+fourth_id_byte=0x1d parts=4,32,816,4,160,8
+ls -al /dev/mtd*
+dd if=/dev/mtd5 | hexdump -c
+dd if=/dev=urandom of=bootloader.img bs=128k count=4 
+nandwrite /dev/mtd0 bootloader.img
+nanddump /dev/mtd0 -f bootloader.reread.img
+flash_erase /dev/mtd0 0 0
+nanddump /dev/mtd0 | hexdump -c
+genromfs -f recovery.romfs.img -d filesystem
+flash_erase /dev/mtd4 0 0
+mount -t romfs /dev/mtdblock4 /mnt
+ls -la /mnt
+mkfs.jffs2 -r filesystem -e 128 -o recovery.jffs2.img -p
+flash_erase /dev/mtd4 0 0
+nandwrite -p /dev/mtd4 recovery.jffs2.img
+mount -t jffs2 /dev7mtdblock4 /mnt
+touch /mnt/new-file-okay
+mkfs.ubifs -m 2048 -e 128KiB /dev/ubi0_0
+mkfs.ubifs -m 2048 -e 128KiB -c 710 /tmp/new-ubifs-image
+ubiformat /dev/mtd2 -s 2048 -o 2048
+ubiattach -p /dev/mtd2 -o 2048
+ubimkvol -N volume1 -s 40MiB /dev/ubi0
+ubinfo /dev/ubi0
+
+
+
+
+root@OpenWrt:/overlay/upper/usr# mount
+/dev/root on /rom type squashfs (ro,relatime)
+proc on /proc type proc (rw,nosuid,nodev,noexec,noatime)
+sysfs on /sys type sysfs (rw,nosuid,nodev,noexec,noatime)
+tmpfs on /tmp type tmpfs (rw,nosuid,nodev,noatime)
+/dev/mtdblock4 on /overlay type jffs2 (rw,noatime)
+overlayfs:/overlay on / type overlay (rw,noatime,lowerdir=/,upperdir=/overlay/upper,workdir=/overlay/work)
+tmpfs on /dev type tmpfs (rw,nosuid,relatime,size=512k,mode=755)
+devpts on /dev/pts type devpts (rw,nosuid,noexec,relatime,mode=600,ptmxmode=000)
+debugfs on /sys/kernel/debug type debugfs (rw,noatime)
+
+git clone https://github.com/openwrt/openwrt.git
+git checkout openwrt-19.07
+# Fetch and list tags
+git fetch --tags
+git tag -l
+ 
+# Use OpenWrt 19.07.6 release
+git checkout v19.07.6
+
+
+------------
+#!/usr/bin/lua
+
+require "nixio"
+
+dbg = io.open("/tmp/luci.req", "w")
+
+for k, v in pairs(nixio.getenv()) do
+    dbg:write(string.format("export %s=%q\n", k, v))
+end
+
+dbg:write("/www/cgi-bin/luci\n")
+dbg:close()
+nixio.exec("/www/cgi-bin/luci")
+---------------

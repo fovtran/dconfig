@@ -1,0 +1,36 @@
+C:\Users\diego2\AppData\Local\Google\Chrome\UserData
+C:\Users\diego2\AppData\Local\pip\cache
+C:\Users\diego2\AppData\Local\Diagnostics\*
+C:\Users\diego2\AppData\Local\Thinstall
+C:\Users\diego2\AppData\Roaming\Thinstall
+C:\Users\diego2\AppData\Local\SquirrelTemp
+C:\Users\diego2\AppData\Local\Python-Eggs
+C:\Users\diego2\AppData\Local\clink\clink.log
+C:\Users\diego2\AppData\Local\Apps\2.0\*
+C:\Users\diego2\AppData\Local\XmlExplorer\*
+C:\Users\diego2\AppData\Local\NVIDIA Corporation\*
+C:\Users\diego2\AppData\Local\NetBeans\Cache
+C:\Users\diego2\AppData\Roaming\Twitch Setup
+C:\Users\diego2\AppData\Roaming\vstelemetry\*
+C:\Users\diego2\AppData\Roaming\WikidPad
+C:\Users\diego2\AppData\Roaming\ChocolateyGUI\Logs
+C:\Users\diego2\AppData\Roaming\NVIDIA Corporation\Nsight
+C:\Users\diego2\AppData\Roaming\NVIDIA\GLCache
+C:\Users\diego2\AppData\Roaming\NVIDIA\ComputeCache
+C:\Users\diego2\AppData\Roaming\MathWorks
+C:\Users\diego2\AppData\Local\SCE\*
+C:\Users\diego2\AppData\Local\Temp
+C:\ProgramData\Microsoft\Network\Downloader
+C:\ProgramData\Package Cache\*
+C:\ProgramData\Kaspersky Lab Setup Files
+C:\ProgramData\NVIDIA Corporation\NetService
+C:\ProgramData\Microsoft\VisualStudio\Packages
+C:\ProgramData\Microsoft\Vault
+C:\Users\diego2\.thumbnails\*
+C:\Users\diego2\nvvp_workspace
+C:\tmp
+C:\temp
+C:\Windows\Temp
+C:\PerfLogs\*
+
+"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --disk-cache-dir="c:\tmp\chromecache" --user-data-dir="c:\user\diego2\desktop\mychrome\UData3"

@@ -1,0 +1,34 @@
+git init
+git add .
+git commit -am ""
+git push origin master
+git push --force origin master
+
+git log --pretty=oneline
+git log origin/master --pretty=oneline
+git log HEAD --pretty=oneline
+git status -uno -u
+git show-branch *master
+git remote show origin
+
+git remote update && git status 
+git fetch origin master
+From https://github.com/fovtran/projects
+ * branch            master     -> FETCH_HEAD
+   71d0fc3..0fd4c35  master     -> origin/master
+
+----------------------------------
+git checkout master
+git pull origin master
+git branch --set-upstream-to=origin/master master
+
+git diff origin/master
+git merge origin/master
+-----------------------------------
+
+# cleanup
+git gc
+git prune
+git fsck --full --dangling
+git repack -a
+git reset --hard HEAD

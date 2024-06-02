@@ -1,0 +1,13 @@
+systemctl list-units --type=service
+systemctl list-units --type=mount
+systemctl list-units --type=target
+systemctl list-units --type=service --state=active
+systemctl list-units --type=service --state=running
+systemctl status nmbd.service" and "journalctl -xe"
+
+cd /tmp
+find . -type f --exec chmod u=rw,go= {} \;
+find . -type d --exec chmod u=rwx,go= {} \;
+
+ldconfig -p
+

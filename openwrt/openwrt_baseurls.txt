@@ -1,0 +1,4 @@
+https://downloads.openwrt.org/releases/19.07.5/packages/mips_mips32/base/
+https://downloads.openwrt.org/releases/19.07.5/packages/
+https://downloads.openwrt.org/releases/19.07.5/packages/
+https://downloads.openwrt.org/snapshots/targets/bcm63xx/generic/

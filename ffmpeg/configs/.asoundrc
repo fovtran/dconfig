@@ -1,0 +1,12 @@
+pulse {
+        type                    "alsa"
+        name                    "Sound Card"
+        device                  "hw:0,0"     # optional
+        format                  "44100:16:2" # optional
+}
+
+pcm.pulse { type pulse }
+ctl.pulse { type pulse }
+
+pcm.!default { type pulse }
+ctl.!default { type pulse }

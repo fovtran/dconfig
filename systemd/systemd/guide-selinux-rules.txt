@@ -1,0 +1,481 @@
+he Guide to Writing SELinux Policy
+Prev 	Home 	Next
+5. User related files
+
+This section will discuss policy files related to actual users on the system, and where you can determine their level of access. In "Getting Started with SE Linux HOWTO" we saw that "an identity under SE Linux is not the same as the traditional Unix uid (user id). They can coexist together on the same system, but are quite different. identities under SE Linux form part of a security context which will affect what domains can be entered, i.e. what essentially can be done. An SE Linux identity and a standard Unix login name may have the same textual representation (and in most cases they do), however it is important to understand that they are two different things."
+
+5.1 The users file
+
+The users file, found in your policy source directory for your distribution, such as/etc/selinux/users under Debian, contains definitions for each user that is to be recognised by your SE Linux system. If a user identity is explicitly named in this file, their user identity will form the first part of their security context. A security context is made up of the identity, role and domain or type. You can check your own current security context by running the id command under SE Linux. If a user identity is not named in the users file, they will be assigned the user_u identity.
+
+Following are some example entries in a users file.
+
+user root roles { staff_r sysadm_r };
+
+This entry defines user identity root, and allows root to enter the staff_r and sysadm_r roles. The newrole command can be used to change user roles, or root (in this example) can choose to enter one of the roles above when logging in at the console.
+
+user faye roles { staff_r sysadm_r };
+
+Again, this entry defines the user identity faye. As with root, faye is also able to enter the sysadm_r role, which is the system administrator role. These two examples show you that the traditional root user does not necessarily have to have sysadm_r privileges just because they are user root, and that another user (such as faye) can have access to the system administrator role. If the roles definition for user root did not have sysadm_r, faye would be more powerful than root. 
+
+6. System administrator related files
+
+This section will discuss the policies related to the sysadm_r role, i.e., the system administrator. We have already seen how an SE Linux identity can be granted sysadm_r in section 4.1.
+
+6.1 The admin_macros.te file
+
+The admin_macros.te file contains macros for the system administration domains.
+
+-----
+
+undefine(`admin_domain')
+define(`admin_domain',`
+# Inherit rules for ordinary users.
+user_domain($1)
+
+Define the macro admin_domain and allow it to have the same rules as user_t. $1 in this case would be sysadm.
+
+-----
+
+allow $1_t policy_config_t:dir { getattr search };
+allow $1_t policy_config_t:file getattr;
+
+Allow sysadm_t to getattr (things such as ls -l) and search files and directories under a directory that has a type of policy_config_t.
+
+-----
+
+allow $1_t kernel_t:system syslog_read;
+
+Allow sysadm_t to read the system logs. kernel_t is the type for the kernel itself. system is the class of the operation, the operation being to read the syslog.
+
+-----
+
+# Use capabilities other than sys_module.
+allow $1_t self:capability ~sys_module;
+
+Allow sysadm_t to use all capabilities apart from sys_module, which is used to load modules.
+
+-----
+
+# Get security policy decisions.
+can_getsecurity($1_t)
+
+If you look at the file core_macros.te (under the macros directory) and search for can_getsecurity, this is what you see:
+
+# can_getsecurity(domain)
+#
+# Authorize a domain to get security policy decisions.
+#
+define(`can_getsecurity',`
+allow $1 security_t:dir { read search getattr };
+allow $1 security_t:file { getattr read write };
+allow $1 security_t:security { check_context compute_av compute_create compute_relabel compute_user };
+')
+
+Here, $1 is allowed to read, search and get attributes of a directory of type security_t (your policy source directory). $1 can also get attributes, read and write files in a directory of type security_t. Finally, $1 cancheck context validity, check whether the policy permits the source context to access the target context, compute a context for the labelling of a new object, compute the new context when relabelling an object, and to determine which user contexts can be reached from a given source context. 
+
+7. the file_contexts file
+
+The file_contexts file contains security contexts which are applied to files on the system when a security policy installed. This file is read by the setfiles program and uses the information to label files. Below are some examples and explanations.
+
+# The security context for all files not otherwise specified./.*                             system_u:object_r:file_t
+
+This line sets the security context on files that do not have a specified context. system_u is the idenity for system processes and daemons and is the default identity for files owned by the system.
+
+# The root directory.
+/                       -d      system_u:object_r:root_t
+
+Set the context with a type of root_t for the actual root directory (specified by the -d)./mnt and/initrd also have the type root_t.
+
+/home/[^/]+             -d      system_u:object_r:user_home_dir_t/home/[^/]+/.+                  system_u:object_r:user_home_t
+
+For the actual/home directory, set the type to user_home_dir_t. For files underneath it, set the type to user_home_t.
+
+You should be able to get a general understanding of everything else in this file, and it does help to have a good understanding of regular expressions.
+
+In the middle column, you may see -- which refers to a regular file. -d refers to a directory. Nothing listed means anything is matched. If you do an "ls -l" command, the first character of the first column of output is what appears in the middle column. So if something was a symbolic link you'd see -l, -b for a block device and so forth.
+
+
+8. the types directory
+
+The types directory contains definitions of types, broken up in to the following files:
+
+8.1 device.te
+
+This file contains the types for device nodes.
+
+type device_t, file_type;
+
+This line defines the type device_t for/dev. file_type is the attribute that is used for all types for files and directories. If you search for/dev in the file file_context you will see its type is set to device_t.
+
+ type null_device_t, file_type, device_type, mlstrustedobject;
+
+Defines the type null_device_t for/dev/null. The device_type attribute identifies all types assigned to device nodes. mlstrustedobject is not used at this time.
+
+8.2 devpts.te
+
+This file contains the types for pseudo ttys.
+
+type devpts_t, fs_type, root_dir_type;
+
+Set the type of the devpts filesystem (devpts_t) and the type of the root directory of that filesystem.
+
+8.3 file.te
+
+This file contains the types for files.
+
+type unlabeled_t, sysadmfile;
+
+Unlabeled objects have the type unlabeled_t. Any time you change the policy to remove the definition of a type, everything that uses that type becomes unlabeled.
+
+8.4 network.te
+
+This file contains the types for networking.
+
+type netif_t, netif_type;
+type netif_eth0_t, netif_type;
+type netif_eth1_t, netif_type;
+type netif_eth2_t, netif_type;
+type netif_lo_t, netif_type;
+type netif_ippp0_t, netif_type;
+
+The netif types are used for network interfaces.
+
+8.5 nfs.te
+
+This file contains types for NFS usage.
+
+type nfs_t, fs_type, root_dir_type;
+
+nfs_t is the default type for NFS file systems and their files. Set the root directory of the NFS file system to be of type nfs_t. 
+
+9. the macros directory
+
+We've already covered the files user_macros.te and admin_macros.te. The two other files in the macros directory are core_macros.te and global_macros.te.
+
+9.1 core_macros.te
+
+The core_macros.te file contains macros that are not changed very often, and it is recommended that you don't change them:) This is because core related policy should be the same if you want to share policy. Changing something in this file might render your policy incompatible with what everyone else is doing. Of course, if you don't care about anyone else, go ahead and change it. If you've changed your core_macros.te file, this may result in you having a system that works differently from everyone else, which may not be in your best interests.
+
+Some of the macros contained in this file are macros for groupings of classes and permissions:
+
+define(`dir_file_class_set', `{ dir file lnk_file sock_file fifo_file chr_file blk_file }')
+
+This line defines the macro dir_file_class_set which contains the classes dir (for directories), file (for files), lnk_file (for symbolic links), sock_file (for Unix domain sockets), fifo_file (for named pipes), chr_file (for character block devices) and blk_file (for block devices).
+
+define(`rw_file_perms', `{ ioctl read getattr lock write append }')
+
+This line defines the macros rw_file_perms which contains the permissions ioctl (for ioctl's), read (read file), getattr (get attributes) and then lock, write and append.
+
+9.2 global_macros.te
+
+The global_macros.te file contains macros that are system wide, meaning they are not tied to particular policy files. You can edit this file if you want to, but it probably won't happen often.
+
+define(`can_setexec',`
+allow $1 self:process setexec;
+allow $1 proc_t:dir search;
+allow $1 proc_t:{ file lnk_file } read;
+allow $1 self:dir search;
+allow $1 self:file { read write };
+')
+
+Defines the macro can_setexec. $1 is able to set the execute context, so it can set the context of a child process. $1 can search/proc and can read files and symlinks in that directory.
+
+9.3 the macros/program directory
+
+The program subdirectory contains additional macros for programs that need per-user role policy. Programs such as ssh require a per-user role policy as the derived domains are based on the calling user domain. If you look at the file ssh_macros.te you'll see 
+
+10. the flask directory
+
+The flask directory contains the following files:
+
+access_vectors
+This file defines the actions that can be performed for various classes. For the file class, you may perform actions such as read, write, link and so forth. For the socket class, you can perform actions like bind (for binding to a socket such as a TCP or UDP socket), listen (for incoming connections), connect and so on. Take a look through this file to familiarise yourself with the different actions various classes may perform.
+
+initial_sids
+This file defines the initial SIDS (Security Identifiers). In the old SE Linux, SIDS were used in the userspace interface to the kernel. PSIDs (Persistent SIDs) were used in the kernel code for mapping files to contexts for files and directories on disk. See the NSA's document "Configuring the SELinux Policy" document for more information. In the new SE Linux, the extended attributes contain the context so SIDs and PSIDs are no longer necessary. Even though the new SE Linux uses extended attributes, some initial contexts still need to be defined when a system is started. The initial_sids file contains the initial SID contstants. The file initial_sid_contexts in your policy source directory maps these initial SIDS to contexts, and some examples follow:
+
+sid kernel      system_u:system_r:kernel_t
+sid security    system_u:object_r:security_t
+
+The first line defines the initial SID of kernel, and gets the context of system_u:system_r:kernel_t . kernel_t is the type for general kernel code. The second line gives the sid security the context of system_u:object_r:security_t where security_t is the type for the/selinux file system.
+
+security_classes
+This file defines the security object classes. These are the classes for things such as files and networking.
+
+An in-depth discussion of the Flask architecture is way beyond the scope of this document, but more information can be found in the NSA document "Configuring the SELinux Policy", particularly the section "Architectural Concepts and Definitions", at https://www.nsa.gov/selinux/doc/policy2/x34.html 
+
+12. Basic policy editing examples
+
+Following are some examples of things you can try to get a feel for editing policy. Don't forget to run make load in your policy source directory after saving the policy file.
+
+12.1 Allow user_t to use tcpdump
+
+If you haven't done so already, create a custom file (let's call it custom.te) in the subdirectory domains/misc/ under your policy source directory. Add the following lines:
+
+# your own comment here
+domain_auto_trans(userdomain, netutils_exec_t, netutils_t)
+in_user_role(netutils_t)
+allow netutils_t user:chr_file rw_file_perms;
+
+First of all, we need to be able to transition from the user domain (userdomain here refers to all possible user domains, so user_t, staff_t, sysadm_t and whatever other user domains you may have) to the domain for the actual tcpdump process, which is netutils_exec_t. What the first line is saying is "when the user domain runs the tcpdump executable, an automatic transition is made to the tcpdump process domain which is netutils_t".
+
+The in_user_role macro (defined in the file user_macros.te) permits the domain passed as a parameter (in this case netutils_t) to be in all the user roles (such as user_r and staff_r. sysadm_r is an administrative role, not a user role). This line is needed so that any combination of role user_r and domain netutils_t is valid in a security context.
+
+The third line allows the domain netutils_t to access user pty types. netutils_t needs this access so that you can read from and write to your terminal device. chr_file is needed to write to the terminal device.
+
+Exercise 1: Play around with these lines. Comment out the allow line, reload the policy and try to tcpdump. Check the logs to give you hints on why nothing seems to be happening.
+
+Exercise 2: With the allow line commented out, switch to a virtual console (assuming you were using an xterm before) and try to tcpdump from there. If you have not specifically allowed tcpdump access from a tty device, try to make it happen. You should be able to tcpdump from a pty device, but not from a tty device so make the necessary changes and try again.
+
+12.2 Allow user_t to read the/etc/selinux/ directory.
+
+Ordinarily you probably don't want unprivileged users to see what's in/etc/selinux/ but for the sake of learning (assuming you're on a test machine playing around with SE Linux) I'll use this example. Edit your custom.te file to include the following:
+
+# your comment here
+r_dir_file(user_t,policy_src_t)
+
+The r_dir_file allows you to read a directory and files underneath it. user_t is the domain, and policy_src_t is the type of/etc/selinux .
+
+Exercise 1: try to access/etc/selinux before and after editing custom.te (and reloading the policy). Check the logs to see what's happening.
+
+Exercise 2: from user_t try to access/boot. Got "permission denied"? Create a rule that allows user_t to read this directory.
+
+12.3 Creating a new type
+
+In this example we'll create a new file type for ourselves in custom.te so add the following lines and then run the make load command:
+
+type ourtype_t,file_type,sysadmfile;
+allow staff_t ourtype_t:file { create_file_perms relabelfrom relabelto };
+
+We define our new type called "ourtype_t", assign it the attribute file_type and sysadmfile so that the administrator can access it. The second line says that staff_t has full access to files of type ourtype_t (read, write and so forth). The relabelfrom and relabelto mean that staff_t can relabel files of type ourtype_t from and to another type.
+
+Now, in a staff_t role (I'm not going to tell you how to do that, read the Getting Started with SE Linux HOWTO) create a file. Check the security context of that file:
+
+faye@kaos:~$ ls -Z foo
+-rw-r--r--  faye     faye     faye:object_r:staff_home_t       foo
+
+So we see file "foo" has the type staff_home_t. Now change that type to ourtype_t:
+
+faye@kaos:~$ chcon -t ourtype_t foo
+faye@kaos:~$ ls -Z foo
+-rw-r--r--  faye     faye     faye:object_r:ourtype_t          foo
+
+Now let's remove the type we just created. Once again, edit your custom.te file to comment out what you just added. Run make load again, and try to look at the file's attributes:
+
+faye@kaos:~$ ls -Z foo
+ls: foo: Permission denied
+
+As sysadm_r run the same ls command:
+
+-rw-r--r--  faye     faye     faye:object_r:ourtype_t/home/faye/foo
+
+Now check your logs for the error that was logged when, as staff_r, you tried to access file foo:
+
+avc:  denied  { getattr } for  pid=29494 exe=/bin/ls path=/home/faye/foo dev=md7 ino=145445 sc
+_r:staff_t tc t
+
+Note that the target context contains the type unlabeled_t for file foo. When we removed type ourtype_t from the policy, any files we created with that type are relabelled to type unlabeled_t. Note that even though ls -Z says the type is ourtype_t the kernel regards it as unlabeled_t as ourtype_t does not exist in the policy. 
+
+13. Case study: the policy for INN
+
+I will use the policy written for INN (InterNetNews server) to help you get a better idea of writing policy for an application. After you edit and save the policy file, run "make load" in your policy source directory to apply the changes.
+
+There are three files involved with the policy for INN. One is/etc/selinux/domains/program/innd.te . The second is the corresponding file_contexts file,/etc/selinux/file_contexts/program/innd.fc. The third is the net_contexts file.
+
+13.1 The innd.te file
+
+Here is the entire policy. When you start writing policy, you can try and start the daemon. You'll get lots of messages in your logs, so you'll have to create rules to begin eliminating any "denied" messages. These give you clues as to what to do next.
+
+#DESC INN - InterNetNews server
+#
+# Author:  Faye Coker <faye@lurking-grue.org>
+# X-Debian-Packages: inn
+#
+################################
+
+# Types for the server port and news spool.
+#
+type innd_port_t, port_type;
+type news_spool_t, file_type, sysadmfile;
+
+
+# need privmail attribute so innd can access system_mail_t
+daemon_domain(innd, `, privmail')
+
+# allow innd to create files and directories of type news_spool_t
+create_dir_file(innd_t, news_spool_t)
+
+# allow user domains to read files and directories these types
+r_dir_file(userdomain, { news_spool_t innd_var_lib_t innd_etc_t })
+
+can_exec(initrc_t, innd_etc_t)
+can_exec(innd_t, { innd_exec_t bin_t })
+ifdef(`hostname.te', `
+can_exec(innd_t, hostname_exec_t)
+')
+
+allow innd_t var_spool_t:dir { getattr search };
+
+can_network(innd_t)
+
+can_unix_send( { innd_t sysadm_t }, { innd_t sysadm_t } )
+allow innd_t self:unix_dgram_socket create_socket_perms;
+allow innd_t self:unix_stream_socket create_stream_socket_perms;
+can_unix_connect(innd_t, self)
+
+allow innd_t self:fifo_file rw_file_perms;
+allow innd_t innd_port_t:tcp_socket name_bind;
+
+allow innd_t self:capability { dac_override kill setgid setuid net_bind_service };
+allow innd_t self:process setsched;
+
+allow innd_t { bin_t sbin_t }:dir search;
+allow innd_t usr_t:lnk_file read;
+allow innd_t usr_t:file { getattr read ioctl };
+allow innd_t lib_t:file ioctl;
+allow innd_t { etc_t resolv_conf_t }:file { getattr read };
+allow innd_t { proc_t etc_runtime_t }:file { getattr read };
+allow innd_t urandom_device_t:chr_file read;
+
+allow innd_t innd_var_run_t:sock_file create_file_perms;
+
+# allow innd to read directories of type innd_etc_t (/etc/news/(/.*)? and symbolic links with that type
+etcdir_domain(innd)
+
+# allow innd to create files under/var/log of type innd_log_t and have a directory for its own files that
+# it can write to
+logdir_domain(innd)
+
+# allow innd read-write directory permissions to/var/lib/news.
+var_lib_domain(innd)
+
+ifdef(`crond.te', `
+system_crond_entry(innd_exec_t, innd_t)
+')
+
+The first step is to create the file. Because innd is a daemon listening on a port, we will need to create the type innd_port_t and assign it the port_type attribute (remember the attrib.te file?). We also know that a news spool is required, and we want to have a label assigned to the news spool files specific to INN. We call that type news_spool_t and give it the attributes of file_type and sysadmfile. sysadmfile is needed because we must grant access to the administrator domain to access those files with type news_spool_t. So from all this, we get
+
+type innd_port_t, port_type;
+type news_spool_t, file_type, sysadmfile;
+
+Next, we need the macro daemon_domain() so that we can establish innd as a daemon with its own domain (which is innd_t). We need the attribute privmail because innd needs to be able to transition to the system_mail_t domain in order to send mail. Now we have
+
+daemon_domain(innd, `, privmail')
+
+Above we created the type news_spool_t and now we want innd to be able to create the files and directories with that type. The create_dir_file() macro is needed for this so we have
+
+create_dir_file(innd_t, news_spool_t)
+
+which says that innd_t can create directories and files of type news_spool_t.
+
+We need our unprivileged users to be able to read the news spool files. We also need them to be able to read/var/lib/news/ which has been assigned the type innd_var_lib_t (see the innd.fc file), and we need them to be able to read/etc/news/ which has the type innd_etc_t. When these rules aren't plugged in, you'll get "avc denied" messages in your logs, so from there we work out what labels and rules are needed. Now we have 
+
+r_dir_file(userdomain, { news_spool_t innd_var_lib_t innd_etc_t })
+
+When starting up innd at this point, I received avc denied messages for initrc_d not being able to access innd_etc_t, and innd_t not being to access innd_exec_t and bin_t. We need the can_exec() macro here so that innd_t can execute programs of those types, giving us
+
+can_exec(initrc_t, innd_etc_t)
+can_exec(innd_t, { innd_exec_t bin_t })
+
+An avc denied message in the logs was showing that innd_t could not access hostname_exec_t. We could put in a rule allowing innd_t to execute files of type hostname_exec_t but instead we take the following approach:
+
+ifdef(`hostname.te', `
+can_exec(innd_t, hostname_exec_t)
+')
+
+The ifdef line is used with the can_exec macro because if you don't name hostname.te in the policy, then there will be no type hostname_exec_t and the policy won't compile. We then use the can_exec() macro as before.
+
+We now want innd_t to be able to search and get the attributes of directories with the type var_spool_t and looking for var_spool_t which is the/var/spool directory.
+
+allow innd_t var_spool_t:dir { getattr search };
+
+We know that innd_t will need network functionality so we need the following:
+
+can_network(innd_t)
+
+After that, we'll place all the network related stuff together to make for easier reading.
+
+can_unix_send( { innd_t sysadm_t }, { innd_t sysadm_t } )
+
+The can_unix_send() macro is used for sending Unix datagrams. In the line above we are saying "innd_t can send to and receive from itself and the sysadm_t domain, and sysadm_t can send to and receive from innd_t and itself".
+
+We now need innd_t to be able to create socket permissions in itself (that is, in its own domain of innd_t) so we add
+
+allow innd_t self:unix_dgram_socket create_socket_perms;
+allow innd_t self:unix_stream_socket create_stream_socket_perms;
+
+innd_t will also need to be able to establish a stream connection to itself and for this we need the following macro and parameters:
+
+can_unix_connect(innd_t, self)
+
+innd_t will need read-write file permissions on anonymous pipes (created by the pipe() system call) in the innd_t domain. For this we include
+
+allow innd_t self:fifo_file rw_file_perms;
+
+innd_t will need to bind to a tcp_socket so we need
+
+allow innd_t innd_port_t:tcp_socket name_bind;
+
+innd_t will need the following capabilities listed. See/usr/include/linux/capability.h for more information on what each capability does. innd_t will also need to be able to change the nice levels of innd processes.
+
+allow innd_t self:capability { dac_override kill setgid setuid net_bind_service };
+allow innd_t self:process setsched;
+
+innd_t will need access to the listed domains. For the first allow rule below, innd_t will need to be able to search directories of types bin_t and sbin_t. For the second allow rule, innd_t will need read access to symbolic links of type usr_t. When you have a getattr operation, include a read operation as well (as in the third, fifth and sixth allow rules below) because when you require getattr access, you'll almost certainly be needing read access too.
+
+allow innd_t { bin_t sbin_t }:dir search;
+allow innd_t usr_t:lnk_file read;
+allow innd_t usr_t:file { getattr read ioctl };
+allow innd_t lib_t:file ioctl;
+allow innd_t { etc_t resolv_conf_t }:file { getattr read };
+allow innd_t { proc_t etc_runtime_t }:file { getattr read };
+allow innd_t urandom_device_t:chr_file read;
+
+allow innd_t innd_var_run_t:sock_file create_file_perms;
+
+innd_t will need to be able to read the/etc/news directory and files in it. innd_etc_t is the type assigned to/etc/news (see innd.fc). The file global_macros.te contains the macro definition for etcdir_domain, so read it to get a better idea of what it does. To our innd.te policy file we now add
+
+etcdir_domain(innd)
+
+innd_t will need to create log files under/var/log with a type of innd_var_log_t. It will need a directory of its own that it can write to. To achieve this, we need
+
+logdir_domain(innd)
+
+innd_t will need read-write directory permissions to/var/lib/news so we include
+
+var_lib_domain(innd)
+
+Lastly, we need the crond_t domain to be able to transition to innd_t when executing a program with the type innd_exec_t.
+
+ifdef(`crond.te', `
+system_crond_entry(innd_exec_t, innd_t)
+')
+
+13.2 the innd.fc file
+
+The innd.fc file contains the file contexts we need to create for INN. These are the contents:
+
+/usr/sbin/innd.*	--	system_u:object_r:innd_exec_t/var/run/innd(/.*)?		system_u:object_r:innd_var_run_t/etc/news(/.*)?			system_u:object_r:innd_etc_t/etc/news/boot		--	system_u:object_r:innd_exec_t/var/spool/news(/.*)?		system_u:object_r:news_spool_t/var/log/news(/.*)?		system_u:object_r:innd_log_t/var/lib/news(/.*)?		system_u:object_r:innd_var_lib_t/usr/sbin/in.nnrpd	--	system_u:object_r:innd_exec_t/usr/lib/news/bin/.*	--	system_u:object_r:innd_exec_t/usr/bin/inews		--	system_u:object_r:innd_exec_t/usr/bin/rnews		--	system_u:object_r:innd_exec_t
+
+On the lefthand side of the file, we have the files and directories specific to INN. On the righthand side we assign the contexts. It is best to follow naming conventions at all times, such as appending _exec_t to the daemon name for executable files. In the middle of innd.fc we have -- which refers to regular files only. The entry for/etc/news(/.*)? can not contain -- because that directory contains subdirectories and does not consist solely of regular files.
+
+After saving your changes to this file, you need to apply the file contexts. From your policy source directory, run the following command to make the main file_contexts file so you can then relabel parts of the file system concerned with what you've specified in innd.fc :
+
+make file_contexts/file_contexts
+
+If you're not in the policy source directory, run
+
+make -C file_contexts/file_contexts
+
+The next step is to run the setfiles command to relabel each file or directory you have listed on the lefthand side. I'll take the first line of innd.fc as an example:
+
+setfiles -v file_contexts/file_contexts/usr/sbin
+
+After running this command, run a ls -Z command on/usr/sbin/innd.* to see that the relabelling has taken place.
+13.3 The net_contexts file
+
+The net_contexts file in your policy source directory contains security contexts for network entities. The following line needs to be added to this file so that you are assigning tcp port 119 the type innd_port_t and no other type will be able to bind to that port.
+
+ifdef(`innd.te', `portcon tcp 119 system_u:object_r:innd_port_t')
+

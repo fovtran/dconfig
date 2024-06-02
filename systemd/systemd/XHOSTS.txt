@@ -1,0 +1,14 @@
+export DISPLAY=:0.0
+xhost +
+	#access control disabled, clients can connect from any host
+xauth list $DISPLAY
+	#mercury/unix:0  MIT-MAGIC-COOKIE-1  4815129d264983c28df5fbba1eab5330
+
+export XAUTHORITY=~/.Xauthority
+export DISPLAY=:0.0
+
+export DISPLAY=192.168.1.142:1.0
+xauth list $DISPLAY
+	# nothing
+
+xauth add workstation01/unix:0 MIT-MAGIC-COOKIE-1 f601e6a29ea688786765434c5c6324071

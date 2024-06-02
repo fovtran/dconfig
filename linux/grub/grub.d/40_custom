@@ -1,0 +1,89 @@
+#!/bin/sh
+exec tail -n +3 $0
+# This file provides an easy way to add custom menu entries.  Simply type the
+# menu entries you want to add after this comment.  Be careful not to change
+# the 'exec tail' line above.
+
+menuentry 'SDA3 Linux 5.4.176-custonx64-.00' --class debian --class gnu-linux --class gnu --class os $menuentry_id_option 'gnulinux-5.4.76-custom-x64-781b78ab-9b21-4c99-92ac-92368e6328cf' {
+		insmod gzio
+		if [ x$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi
+		insmod part_msdos
+		insmod part_gpt
+		insmod ext2
+		set root='hd1,gpt2'
+		echo	'Loading Linux 5.4.176-custom-x64-00 ...'
+		linux	/boot/vmlinuz-5.4.176-custom-x64-00 root=/dev/sdb3 ro splash quiet nohz=on nohz_full=1,2,3,4 numa=on elevator=bfq rdinit=/bin/systemd resume=/dev/sdb12
+		echo	'Loading initial ramdisk ...'
+		initrd	/boot/initrd.img-5.4.176-custom-x64-00
+}
+
+menuentry 'First custom entry' --class red --class gnu-linux --class gnu --class os $menuentry_id_option 'gnulinux-4.2.0-1.fc23.x86_64-advanced-32782dd0-4b47-4d56-a740-2076ab5e5976' {
+        load_video
+        set gfxpayload=keep
+        insmod gzio
+        insmod part_msdos
+        insmod xfs
+        set root='hd0,msdos1'
+        if [ x$feature_platform_search_hint = xy ]; then
+          search --no-floppy --fs-uuid --set=root --hint='hd0,msdos1'  7885bba1-8aa7-4e5d-a7ad-821f4f52170a
+        else
+          search --no-floppy --fs-uuid --set=root 7885bba1-8aa7-4e5d-a7ad-821f4f52170a
+        fi
+        linux16 /vmlinuz-4.2.0-1.fc23.x86_64 root=/dev/mapper/fedora-root ro rd.lvm.lv=fedora/root vconsole.font=latarcyrheb-sun16 rd.lvm.lv=fedora/swap vconsole.keymap=us crashkernel=auto rhgb quiet LANG=en_US.UTF-8
+        initrd16 /initramfs-4.2.0-1.fc23.x86_64.img
+}
+
+menuentry 'Second custom entry' --class red --class gnu-linux --class gnu --class os $menuentry_id_option 'gnulinux-0-rescue-07f43f20a54c4ce8ada8b70d33fd001c-advanced-32782dd0-4b47-4d56-a740-2076ab5e5976' {
+        load_video
+        insmod gzio
+        insmod part_msdos
+        insmod xfs
+        set root='hd0,msdos1'
+        if [ x$feature_platform_search_hint = xy ]; then
+          search --no-floppy --fs-uuid --set=root --hint='hd0,msdos1'  7885bba1-8aa7-4e5d-a7ad-821f4f52170a
+        else
+          search --no-floppy --fs-uuid --set=root 7885bba1-8aa7-4e5d-a7ad-821f4f52170a
+        fi
+        linux16 /vmlinuz-0-rescue-07f43f20a54c4ce8ada8b70d33fd001c root=/dev/mapper/fedora-root ro rd.lvm.lv=fedora/root vconsole.font=latarcyrheb-sun16 rd.lvm.lv=fedora/swap vconsole.keymap=us crashkernel=auto rhgb quiet
+        initrd16 /initramfs-0-rescue-07f43f20a54c4ce8ada8b70d33fd001c.img
+}
+#menuentry "Install on sdb1" {
+#    set root=(hd1,1)
+#    linux /vmlinuz root=/dev/sdb1 ro quiet splash
+#    initrd /initrd.img
+#}
+#menuentry "Cosmic 18.10 on sdb12 test" {
+#    search --set=root --label cosmic_b --hint hd2,gpt12
+#    configfile /boot/grub/grub.cfg 
+#}
+#menuentry "Boot from USB Drive" {
+#    set root=UUID=XXXX-YYYY
+#    linux /vmlinuz root=UUID=XXXX-YYYY ro quiet splash
+#    initrd /initrd.img
+#}
+#menuentry "Boot from LIVE USB Drive" {
+#   search --set=root --fs-uuid DRIVE_UUID
+#   linux ($root)/casper/vmlinuz boot=casper quiet splash --
+#   initrd ($root)/casper/initrd.lz
+#}
+#menuentry "Windows" {
+#    insmod part_gpt
+#    insmod fat
+#    insmod chain
+#    search --no-floppy --fs-uuid --set=root 3C19-5BFD
+#    chainloader /EFI/Microsoft/Boot/bootmgfw.efi
+#}
+#menuentry "Windows" {
+#    insmod part_msdos
+#    insmod ntfs
+#    insmod ntldr
+#    search --no-floppy --fs-uuid --hint-bios=hd0,msdos1 --set=root 5C68B5F68B5D0CE
+#    ntldr /bootmgr
+#}
+menuentry "ISO Boot: FoxClone" {
+   set isofile="/home/<username>/Downloads/foxclone37.02.iso"
+   loopback loop (hd0,1)$isofile
+   linux (loop)/casper/vmlinuz boot=casper iso-scan/filename=$isofile noprompt noeject quiet splash toram
+   initrd (loop)/casper/initrd.lz
+}
+

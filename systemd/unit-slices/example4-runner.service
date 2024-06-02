@@ -1,0 +1,81 @@
+# Running a process inside a network namespace
+# As a simple test, I define /usr/lib/systemd/system/webserver.service 
+# which runs a simple TCP server over netcat inside the netns. 
+# Notice the JoinsNamespaceOf=netns@webserver.service option, 
+# stating that the service join the network namespace of an already running service. 
+# I added some extra privilege constraint such as ProtectSystem=true and CapabilityBoundingSet= 
+# which are unrelated to network namespaces - these are for another post :)
+
+# Running
+# $ sudo systemctl start \
+#  netns@webserver.service \
+#  attach-enp3s1f0@webserver.service \
+#  webserver.service 
+
+# Now the enp3s1f0 interface has disappeared from the system, as it's no longer in the default namespace
+# $sudo ip l show dev enp3s1f0
+# Device "enp3s1f0" does not exist.
+
+# Let's see if its reachable
+# $ curl http://192.168.0.80:8080
+# OK 
+
+# When a service is running in an alternate network namespace, it is possible to use the service's port on the host system, over all  interfaces.
+# $ /usr/bin/nc --send-only --exec "/usr/bin/echo Foo" -lkp 8080 &
+# [1] 8556
+# $ curl http://0.0.0.0:8080
+# Foo
+# $ curl http://192.168.0.80:8080
+# OK 
+
+# Services running in an alternate network namespace are unaffected by local firewall rules on the host system.
+# $ sudo iptables -t raw -I PREROUTING -p tcp --dport 8080 -j DROP
+# $ curl --max-time=3 http://0.0.0.0:8080
+# curl: (28) Connection timed out after 3001 milliseconds
+# $ curl http://192.168.0.80:8080
+
+# Associating the nginx service with the network namespace
+
+# I add PrivateNetworking=true to the [Service] section and the following lines to the [Unit] section of /usr/lib/systemd/system/nginx.service
+# Requires=webserver.service
+# After=webserver.service
+# JoinsNamespaceOf=netns@webserver.service
+
+# I then run sudo systemctl daemon-reload; sudo systemctl start nginx.service.
+# Let's test it out
+
+# $ curl 192.168.0.80
+
+
+[Unit]
+Description=Example Systemd Service running in Netns
+
+# Require the network namespace is set up
+Requires=netns@webserver.service
+After=netns@webserver.service
+JoinsNamespaceOf=netns@webserver.service
+
+# Require the interface is set up
+Requires=attach-enp3s1f0@webserver.service
+After=attach-enp3s1f0@webserver.service
+
+[Service]
+Type=simple
+RemainAfterStart=true
+
+# Run the process in a non-default netns
+PrivateNetwork=true
+
+# Add additional limitation on privileges
+# (this is unrelated to network namespaces)
+ProtectSystem=true
+CapabilityBoundingSet=
+User=nobody
+Group=nobody
+PrivateTmp=true
+
+# Start the netcat health check service on port 8080
+ExecStart=/usr/bin/nc --send-only --exec "/usr/bin/echo OK" -lkp 8080
+
+[Install]
+WantedBy=multi-user.target
