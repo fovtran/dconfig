@@ -9,16 +9,13 @@ make clean && make V=s
 Prepare USB Bootable System
 
     Download sources:
-
-    svn checkout svn://svn.openwrt.org/openwrt/branches/backfire
+        svn checkout svn://svn.openwrt.org/openwrt/branches/backfire
 
     Change directory to bildroot, then update & install feeds:
-
-    cd backfire && ./scripts/feeds update && ./scripts/feeds install -a
+        cd backfire && ./scripts/feeds update && ./scripts/feeds install -a
 
     Create defconfig and enter MenuConfig:
-
-    make V=s defconfig && make menuconfig
+        make V=s defconfig && make menuconfig
 
         Select the following:
             Target System → Atheros AR71xx/AR7240/AR913x
@@ -89,9 +86,7 @@ Prepare USB Bootable System
     make V=s
 
     Partition external storage, then format first partition as ext2
-
     Extract contents of ./bin/ar71xx/openwrt-ar71xx-rootfs.tar.gz to root of file system
-
     Copy ./bin/ar71xx/openwrt-ar71xx-vmlinux-initramfs.elf to root of file system
 
 
@@ -99,8 +94,7 @@ Prepare USB Bootable System
 
 kexec -ld kernel7l.img
 kexec -d -l /overlay/vmllinux.elf
- file vmlinux.elf 
-
+file vmlinux.elf 
 # kexec -l --append="console=ttyS0,115200 rootfstype=squashfs" /tmp/vmlinux.elf 
 
 

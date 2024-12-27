@@ -1,7 +1,0 @@
-[package]
-name = "readtoml"
-version = "0.0.2"
-authors = ["Yo camposn <yo@localhost.localdomain>"]
-
-[dependencies]
-toml = "0.5.8"

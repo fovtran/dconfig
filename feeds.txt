@@ -1,6 +1,0 @@
-https://planet.freedesktop.org/
-https://planet.debian.org/
-http://planet.kernel.org/
-https://www.kernel.org/
-https://www.kernel.org/feeds/kdist.xml
-https://www.pythoncentral.io/
